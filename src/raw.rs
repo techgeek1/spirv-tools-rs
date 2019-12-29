@@ -1,3 +1,5 @@
+//! Raw bingings for Spirv-Tools API
+
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -11,6 +13,7 @@ macro_rules! spv_bit {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct spv_result_t(i32);
 
 impl spv_result_t {
@@ -40,6 +43,7 @@ impl spv_result_t {
 
 /// Severity levels of messages communicated to the consumer.
 #[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct spv_message_level_t(u32);
 
 impl spv_message_level_t {
@@ -63,6 +67,7 @@ impl spv_message_level_t {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct spv_endianness_t(u32);
 
 impl spv_endianness_t {
@@ -84,6 +89,7 @@ impl spv_endianness_t {
 /// is a member of an optional tuple of values.  In that case the first member
 /// would be optional, and the subsequent members would be required.
 #[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct spv_operand_type_t(u32);
 
 impl spv_operand_type_t {
@@ -263,6 +269,7 @@ impl spv_ext_inst_type_t {
 /// spv_operand_type_t.  But then we'd have some special case differences
 /// between the assembler and disassembler
 #[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct spv_number_kind_t(u32);
 
 impl spv_number_kind_t {
@@ -274,6 +281,7 @@ impl spv_number_kind_t {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct spv_text_to_binary_options_t(u32);
 
 impl spv_text_to_binary_options_t {
@@ -285,6 +293,7 @@ impl spv_text_to_binary_options_t {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct spv_binary_to_text_options_t(u32);
 
 impl spv_binary_to_text_options_t {
@@ -346,7 +355,7 @@ pub struct spv_parsed_instruction_t {
 
 pub struct spv_const_binary_t {
     pub code: *const u32,
-    pub wordCount: size_t
+    pub word_count: size_t
 }
 
 pub struct spv_binary_t {
@@ -374,6 +383,7 @@ pub struct spv_diagnostic_t {
 // Opaque struct containing the context used to operate on a SPIR-V module.
 // Its object is used by various translation API functions.
 pub struct spv_context_t;
+pub struct spv_optimizer_t;
 pub struct spv_validator_options_t;
 pub struct spv_optimizer_options_t;
 pub struct spv_reducer_options_t;
@@ -383,6 +393,8 @@ pub type spv_binary                     = *mut spv_binary_t;
 pub type spv_text                       = *mut spv_text_t;
 pub type spv_position                   = *mut spv_position_t;
 pub type spv_diagnostic                 = *mut spv_diagnostic_t;
+pub type spv_optimizer                  = *mut spv_optimizer_t;
+pub type spv_const_optimizer            = *const spv_optimizer_t;
 pub type spv_const_context              = *const spv_context_t;
 pub type spv_context                    = *mut spv_context_t;
 pub type spv_validator_options          = *mut spv_validator_options_t;
@@ -393,6 +405,7 @@ pub type spv_reducer_options            = *mut spv_reducer_options_t;
 pub type spv_const_reducer_options      = *const spv_reducer_options_t;
 
 #[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct spv_target_env(u32);
 
 impl spv_target_env {
@@ -427,7 +440,7 @@ impl spv_target_env {
     pub const OPENCL_EMBEDDED_1_2: Self = Self(12);
     /// OpenCL Full Profile 2.0 plus cl_khr_il_program, latest revision
     pub const OPENCL_2_0: Self = Self(13);
-    // OpenCL Embedded Profile 2.0 plus cl_khr_il_program, latest revision
+    /// OpenCL Embedded Profile 2.0 plus cl_khr_il_program, latest revision
     pub const OPENCL_EMBEDDED_2_0: Self = Self(14);
     /// OpenCL Embedded Profile 2.1 latest revision
     pub const OPENCL_EMBEDDED_2_1: Self = Self(15);
@@ -443,6 +456,7 @@ impl spv_target_env {
 
 // SPIR-V Validator can be parameterized with the following Universal Limits.
 #[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct spv_validator_limit(u32);
 
 impl spv_validator_limit {
@@ -705,4 +719,35 @@ extern {
 
     /// Prints the diagnostic to stderr.
     pub fn spvDiagnosticPrint(diagnostic: spv_diagnostic) -> spv_result_t;
+
+    /// Create an optimizer instance for the target env
+    pub fn spvOptimizerCreate(env: spv_target_env) -> spv_optimizer;
+
+    /// Destroy an optimizer instance
+    pub fn spvOptimizerDestroy(optimizer: spv_optimizer);
+
+    pub fn spvOptimizerRegisterPerformancePasses(optimizer: spv_optimizer);
+    
+    pub fn spvOptimizerRegisterSizePasses(optimizer: spv_optimizer);
+
+    pub fn spvOptimizerRegisterWebGPUPasses(optimizer: spv_optimizer);
+
+    pub fn spvOptimizerRegisterLegalizationPasses(optimizer: spv_optimizer);
+
+    pub fn spvOptimizerSetTargetEnv(optimizer: spv_optimizer, env: spv_target_env);
+
+    pub fn spvOptimizerRun(
+        optimizer: spv_const_optimizer,
+        original_binary: *const u32,
+        original_bianry_size: size_t,
+        optimized_binary: *mut spv_binary
+    );
+
+    pub fn spvOptimizerRunWithOptions(
+        optimizer: spv_const_optimizer,
+        original_binary: *const u32,
+        original_binary_size: size_t,
+        optimized_binary: *mut spv_binary,
+        opt_options: spv_optimizer_options
+    );
 }
