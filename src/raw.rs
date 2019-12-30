@@ -314,79 +314,85 @@ impl spv_binary_to_text_options_t {
 // in the spir-v specification under the section "Universal Limits".
 pub const kDefaultMaxIdBound: u32 = 0x3FFFFF;
 
-// Structures
 
-// Information about an operand parsed from a binary SPIR-V module.
-// Note that the values are not included.  You still need access to the binary
-// to extract the values.
+/// Information about an operand parsed from a binary SPIR-V module.
+/// Note that the values are not included.  You still need access to the binary
+/// to extract the values.
+#[repr(C)]
 pub struct spv_parsed_operand_t {
-    // Location of the operand, in words from the start of the instruction.
+    /// Location of the operand, in words from the start of the instruction.
     pub offset: u16,
-    // Number of words occupied by this operand.
+    /// Number of words occupied by this operand.
     pub num_words: u16,
-    // The "concrete" operand type.  See the definition of spv_operand_type_t
-    // for details.
+    /// The "concrete" operand type.  See the definition of spv_operand_type_t
+    /// for details.
     pub ty: spv_operand_type_t,
-    // If type is a literal number type, then number_kind says whether it's
-    // a signed integer, an unsigned integer, or a floating point number.
+    /// If type is a literal number type, then number_kind says whether it's
+    /// a signed integer, an unsigned integer, or a floating point number.
     pub number_kind: spv_number_kind_t,
-    // The number of bits for a literal number type.
+    /// The number of bits for a literal number type.
     pub number_bit_width: u32
 }
 
-// An instruction parsed from a binary SPIR-V module.
+/// An instruction parsed from a binary SPIR-V module.
+#[repr(C)]
 pub struct spv_parsed_instruction_t {
-    // An array of words for this instruction, in native endianness.
+    /// An array of words for this instruction, in native endianness.
     pub words: *const u32,
-    // The number of words in this instruction.
+    /// The number of words in this instruction.
     pub num_words: u16,
     pub opcode: u16,
-    // The extended instruction type, if opcode is OpExtInst.  Otherwise
-    // this is the "none" value.
+    /// The extended instruction type, if opcode is OpExtInst.  Otherwise
+    /// this is the "none" value.
     pub ext_inst_type: spv_ext_inst_type_t,
-    // The type id, or 0 if this instruction doesn't have one.
+    /// The type id, or 0 if this instruction doesn't have one.
     pub type_id: u32,
-    // The result id, or 0 if this instruction doesn't have one.
+    /// The result id, or 0 if this instruction doesn't have one.
     pub result_id: u32,
-    // The array of parsed operands.
+    /// The array of parsed operands.
     pub operands: *const spv_parsed_operand_t,
     pub num_operands: u16
 }
 
+#[repr(C)]
 pub struct spv_const_binary_t {
     pub code: *const u32,
     pub word_count: size_t
 }
 
+#[repr(C)]
 pub struct spv_binary_t {
     pub code: *mut u32,
     pub word_count: size_t
 }
 
+#[repr(C)]
 pub struct spv_text_t {
     pub string: *const c_char,
     pub length: size_t
 }
 
+#[repr(C)]
 pub struct spv_position_t {
     pub line: size_t,
     pub column: size_t,
     pub index: size_t
 }
 
+#[repr(C)]
 pub struct spv_diagnostic_t {
     pub position: spv_position_t,
     pub error: *mut c_char,
-    pub isTextSource: bool
+    pub is_text_source: bool
 }
 
 // Opaque struct containing the context used to operate on a SPIR-V module.
 // Its object is used by various translation API functions.
-pub struct spv_context_t;
-pub struct spv_optimizer_t;
-pub struct spv_validator_options_t;
-pub struct spv_optimizer_options_t;
-pub struct spv_reducer_options_t;
+#[repr(C)] pub struct spv_context_t { _priv: [u8; 0] }
+#[repr(C)] pub struct spv_optimizer_t { _priv: [u8; 0] }
+#[repr(C)] pub struct spv_validator_options_t { _priv: [u8; 0] }
+#[repr(C)] pub struct spv_optimizer_options_t { _priv: [u8; 0] }
+#[repr(C)] pub struct spv_reducer_options_t { _priv: [u8; 0] }
 
 pub type spv_const_binary               = *mut spv_const_binary_t;
 pub type spv_binary                     = *mut spv_binary_t;
@@ -831,7 +837,7 @@ extern {
         original_binary: *const u32,
         original_bianry_size: size_t,
         optimized_binary: *mut spv_binary
-    );
+    ) -> bool;
 
     /// Same as above, except it takes an options object.  See the documentation
     /// for |OptimizerOptions| to see which options can be set.
@@ -841,5 +847,5 @@ extern {
         original_binary_size: size_t,
         optimized_binary: *mut spv_binary,
         opt_options: spv_optimizer_options
-    );
+    ) -> bool;
 }
