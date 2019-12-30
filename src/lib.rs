@@ -263,20 +263,20 @@ pub enum ValidatorLimit {
 
 /// A set of options for controlling validation
 pub struct ValidatorOptions {
-    options: spv_validator_options
+    raw: spv_validator_options
 }
 
 impl ValidatorOptions {
     /// Create a new validator options
     pub fn new() -> Self {
         Self { 
-            options: spvValidatorOptionsCreate()
+            raw: unsafe { spvValidatorOptionsCreate() }
         }
     }
 
     /// Records the maximum Universal Limit that is considered valid in the given
     /// Validator options object
-    pub fn limit(mut self, limit: ValidatorLimit) -> Self {
+    pub fn limit(self, limit: ValidatorLimit) -> Self {
         let (limit_type, value) = match limit {
             ValidatorLimit::MaxStructMembers(x)             => (spv_validator_limit::max_struct_members             , x),
             ValidatorLimit::MaxStructDept(x)                => (spv_validator_limit::max_struct_depth               , x),
@@ -289,7 +289,7 @@ impl ValidatorOptions {
             ValidatorLimit::MaxIdBound(x)                   => (spv_validator_limit::max_id_bound                   , x)
         };
 
-        spvValidatorOptionsSetUniversalLimit(self.options, limit_type, value);
+        unsafe { spvValidatorOptionsSetUniversalLimit(self.raw, limit_type, value) };
         self
     }
 
@@ -303,8 +303,8 @@ impl ValidatorOptions {
     ///
     /// 2) the decorations that affect the memory layout are identical for both
     /// types.  Other decorations are not relevant.
-    pub fn relax_store_struct(mut self, relax_store: bool) -> Self {
-        spvValidatorOptionsSetRelaxStoreStruct(self.options, relax_store);
+    pub fn relax_store_struct(self, relax_store: bool) -> Self {
+        unsafe { spvValidatorOptionsSetRelaxStoreStruct(self.raw, relax_store); }
         self
     }
 
@@ -314,8 +314,8 @@ impl ValidatorOptions {
     /// When relaxed, it will allow the following usage cases of pointers:
     /// 1) OpVariable allocating an object whose type is a pointer type
     /// 2) OpReturnValue returning a pointer value
-    pub fn relax_logical_pointer(mut self, relax_ptr: bool) -> Self {
-        spvValidatorOptionsSetRelaxLogicalPointer(self.options, relax_ptr);
+    pub fn relax_logical_pointer(self, relax_ptr: bool) -> Self {
+        unsafe { spvValidatorOptionsSetRelaxLogicalPointer(self.raw, relax_ptr); }
         self
     }
 
@@ -326,8 +326,8 @@ impl ValidatorOptions {
     ///
     /// This is enabled by default when targeting Vulkan 1.1 or later.
     /// Relaxed layout is more permissive than the default rules in Vulkan 1.0.
-    pub fn relax_block_layout(mut self, relax_layout: bool) -> Self {
-        spvValidatorOptionsSetRelaxBlockLayout(self.options, relax_layout);
+    pub fn relax_block_layout(self, relax_layout: bool) -> Self {
+        unsafe { spvValidatorOptionsSetRelaxBlockLayout(self.raw, relax_layout); }
         self
     }
 
@@ -347,26 +347,85 @@ impl ValidatorOptions {
     /// - a member Offset must be a multiple of the member's scalar alignment
     /// - ArrayStride or MatrixStride must be a multiple of the array or matrix
     ///   scalar alignment
-    pub fn scalar_block_layout(mut self, scalar_layout: bool) -> Self {
-        spvValidatorOptionsSetScalarBlockLayout(self.options, scalar_layout);
+    pub fn scalar_block_layout(self, scalar_layout: bool) -> Self {
+        unsafe { spvValidatorOptionsSetScalarBlockLayout(self.raw, scalar_layout); }
         self
     }
 
     /// Records whether or not the validator should skip validating standard
     /// uniform/storage block layout.
-    pub fn skip_block_layout(mut self, skip_layout: bool) -> Self {
-        spvValidatorOptionsSetSkipBlockLayout(self.options, skip_layout);
+    pub fn skip_block_layout(self, skip_layout: bool) -> Self {
+        unsafe { spvValidatorOptionsSetSkipBlockLayout(self.raw, skip_layout); }
         self
     }
 }
 
 impl Drop for ValidatorOptions {
     fn drop(&mut self) {
-        spvValidatorOptionsDestroy(self.options);
+        unsafe { spvValidatorOptionsDestroy(self.raw); }
     }
 }
 
 impl Default for ValidatorOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A set of options for configuring an optimizer pass 
+pub struct OptimizerOptions {
+    raw: spv_optimizer_options
+}
+
+impl OptimizerOptions {
+    /// Create a new optimizer options
+    pub fn new() -> Self {
+        Self {
+            raw: unsafe { spvOptimizerOptionsCreate() }
+        }
+    }
+    
+    /// Records whether or not the optimizer should run the validator before
+    /// optimizing.  If |val| is true, the validator will be run.
+    pub fn run_validator(self, value: bool) -> Self {
+        unsafe { spvOptimizerOptionsSetRunValidator(self.raw, value); }
+        self
+    } 
+
+    /// Records the validator options that should be passed to the validator if it is
+    /// run.
+    pub fn validator_options(self, options: ValidatorOptions) -> Self {
+        unsafe { spvOptimizerOptionsSetValidatorOptions(self.raw, options.raw); }
+        self
+    }
+
+    /// Records the maximum possible value for the id bound.
+    pub fn max_id_bound(self, value: u32) -> Self {
+        unsafe { spvOptimizerOptionsSetMaxIdBound(self.raw, value); }
+        self
+    }
+
+    /// Records whether all bindings within the module should be preserved.
+    pub fn preserve_bindings(self, value: bool) -> Self {
+        unsafe { spvOptimizerOptionsSetPreserveBindings(self.raw, value); }
+        self
+    }
+
+    /// Records whether all specialization constants within the module
+    /// should be preserved.
+    pub fn preserve_spec_constants(self, value: bool) -> Self {
+        unsafe { spvOptimizerOptionsSetPreserveSpecConstants(self.raw, value); }
+        self
+    }
+}
+
+impl Drop for OptimizerOptions {
+    fn drop(&mut self) {
+        unsafe { spvOptimizerOptionsDestroy(self.raw); }
+    }
+}
+
+impl Default for OptimizerOptions {
     fn default() -> Self {
         Self::new()
     }
@@ -531,18 +590,20 @@ pub fn validate_with_options(ctx: Context, binary: &[u32], options: ValidatorOpt
         };
 
         let (err_code, diag) = {
-            let out_diag = ptr::null_mut();
+            let mut out_diag = ptr::null_mut();
             
             let result = if ctx.include_diagnostics {
-                spvValidate(
-                    context, 
+                spvValidateWithOptions(
+                    context,
+                    options.raw,
                     &mut binary as spv_const_binary,
                     &mut out_diag as *mut spv_diagnostic
                 )
             }
             else {
-                spvValidate(
+                spvValidateWithOptions(
                     context,
+                    options.raw,
                     &mut binary as spv_const_binary,
                     ptr::null_mut()
                 )
@@ -569,10 +630,10 @@ pub fn validate_with_options(ctx: Context, binary: &[u32], options: ValidatorOpt
 /// Optimize a spirv binary with the default options
 #[inline]
 pub fn optimize(ctx: Context, binary: Vec<u32>) -> Result<Vec<u32>, Error> {
-    optimize_with_options(ctx, binary, OptimizeOptions::default())
+    optimize_with_options(ctx, binary, OptimizerOptions::default())
 }
 
 /// Optimize a spirv binary with the provided options
-pub fn optimize_with_options(ctx: Context, binary: Vec<u32>, options: OptimizeOptions) -> Result<Vec<u32>, Error> {
+pub fn optimize_with_options(ctx: Context, binary: Vec<u32>, options: OptimizerOptions) -> Result<Vec<u32>, Error> {
     unimplemented!()
 }
