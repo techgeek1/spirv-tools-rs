@@ -24,28 +24,7 @@ use self::raw::*;
 
 pub type SpvResult<T> = Result<T, SpvError>;
 
-/// A context for invoking spirv-tools
-pub struct Context {
-    env: TargetEnv,
-    include_diagnostics: bool
-}
-
-impl Context {
-    /// Create a new context for the target environment
-    pub fn new(env: TargetEnv) -> Self {
-        Self {
-            env: env,
-            include_diagnostics: false
-        }
-    }
-
-    /// Include diagnostic information in any error codes
-    pub fn with_diagnostics(mut self) -> Self {
-        self.include_diagnostics = true;
-        self
-    }
-}
-
+#[derive(Clone, Copy)]
 pub enum TargetEnv {
     /// SPIR-V 1.0 latest revision, no other restrictions
     Universal1_0,
@@ -122,11 +101,11 @@ impl TargetEnv {
 
 /// Options for dissassembling a spirv binary
 #[derive(Clone, Copy)]
-pub struct TextOptions {
+pub struct DisassembleOptions {
     raw: u32
 }
 
-impl TextOptions {
+impl DisassembleOptions {
     pub fn none() -> Self {
         Self { raw: 0 }
     }
@@ -284,203 +263,225 @@ impl Default for ValidatorOptions {
     }
 }
 
-/// Assemble a spirv binary from it's textual form
-pub fn assemble(ctx: Context, source: &str) -> Result<Vec<u32>, AssembleError> {
-    unsafe {
-        // Setup to call the C library
-        let context = spvContextCreate(ctx.env.to_raw());
-        let src = CString::new(source)
-            .map_err(|_| AssembleError::InvalidSourceString(source))?;
-        
-        // Assemble the source code
-        let (err_code, bin, diag) = {
-            let str_ptr = src.as_ptr();
-            let str_len = src.as_bytes().len();
-            
-            let mut out_bin: spv_binary = ptr::null_mut();
-            let mut out_diag = ptr::null_mut();
+/// A context for invoking spirv-tools
+pub struct SpirvContext {
+    env: TargetEnv,
+    include_diagnostics: bool
+}
 
-            let result = if ctx.include_diagnostics {
-                spvTextToBinary(
-                    context, 
-                    str_ptr,
-                    str_len,
-                    &mut out_bin as *mut spv_binary,
-                    &mut out_diag as *mut spv_diagnostic
-                )
-            }
-            else {
-                spvTextToBinary(
-                    context, 
-                    str_ptr,
-                    str_len,
-                    &mut out_bin as *mut spv_binary,
-                    ptr::null_mut()
-                )
-            };
-
-            (result, out_bin, out_diag)
-        };
-
-        // Copy over the resulting code from C memory to Rust memory
-        let result = match err_code {
-            spv_result_t::SUCCESS => {
-                let slice = slice::from_raw_parts(
-                    (*bin).code, 
-                    (*bin).word_count as usize
-                );
-
-                let mut binary = Vec::with_capacity(slice.len());
-                binary.copy_from_slice(slice);
-
-                Ok(binary)
-            },
-            _                     => {
-                let (err, diag) = SpvError::from_raw(err_code, diag);
-                Err(AssembleError::SpirvTools(err, diag))
-            }
-        };
-
-        // Cleanup
-        if !diag.is_null() {
-            spvDiagnosticDestroy(diag);
+impl SpirvContext {
+    /// Create a new context for the target environment
+    pub fn new(env: TargetEnv) -> Self {
+        Self {
+            env: env,
+            include_diagnostics: false
         }
-
-        if !bin.is_null() {
-            spvBinaryDestroy(bin);
-        }
-
-        spvContextDestroy(context);
-
-        result
     }
-}
 
-/// Disassemble a spirv binary into it's textual form using default options
-#[inline]
-pub fn disassemble(ctx: Context, binary: &[u32]) -> Result<String, DisassembleError> {
-    disassemble_with_options(ctx, binary, TextOptions::none())
-}
-
-/// Disassemble a spirv binary into it's textual form with the specified options
-pub fn disassemble_with_options(ctx: Context, binary: &[u32], options: TextOptions) -> Result<String, DisassembleError> {
-    unsafe {
-        // Setup and disassemble the binary
-        let context = spvContextCreate(ctx.env.to_raw());
-
-        let (err_code, text, diag) = {
-            let mut out_text: spv_text = ptr::null_mut();
-            let mut out_diag = ptr::null_mut();
-
-            let result = if ctx.include_diagnostics {
-                spvBinaryToText(
-                    context,
-                    binary.as_ptr(),
-                    binary.len(),
-                    options.into_raw(),
-                    &mut out_text as *mut spv_text,
-                    &mut out_diag as *mut spv_diagnostic
-                )
-            }
-            else {
-                spvBinaryToText(
-                    context,
-                    binary.as_ptr(),
-                    binary.len(),
-                    options.into_raw(),
-                    &mut out_text as *mut spv_text,
-                    ptr::null_mut()
-                )
-            };
-
-            (result, out_text, out_diag)
-        };
-
-        let result = match err_code {
-            spv_result_t::SUCCESS => {
-                let bytes = slice::from_raw_parts(
-                    (*text).string as *const u8, 
-                    (*text).length
-                );
-
-                let text = str::from_utf8(bytes)
-                    .and_then(|x| Ok(x.to_owned()))
-                    .expect("Spirv Tools returned an invalid encoding!");
-
-                Ok(text)
-            },
-            _                     => {
-                let (err, diag) = SpvError::from_raw(err_code, diag);
-                Err(DisassembleError::SpirvTools(err, diag))
-            }
-        };
-
-        if !diag.is_null() {
-            spvDiagnosticDestroy(diag);
-        }
-
-        if !text.is_null() {
-            spvTextDestroy(text);
-        }
-
-        spvContextDestroy(context);
-
-        result
+    /// Include diagnostic information in any error codes
+    pub fn with_diagnostics(mut self) -> Self {
+        self.include_diagnostics = true;
+        self
     }
-}
 
-/// Validate a spirv binary with the default options
-#[inline]
-pub fn validate(ctx: Context, binary: &[u32]) -> Result<(), ValidateError> {
-    validate_with_options(ctx, binary, ValidatorOptions::default())
-}
-
-/// Validate a spirv binary with a set of options
-pub fn validate_with_options(ctx: Context, binary: &[u32], options: ValidatorOptions) -> Result<(), ValidateError> {
-    unsafe {
-        let context = spvContextCreate(ctx.env.to_raw());
-        let mut binary = spv_const_binary_t {
-            code: binary.as_ptr(),
-            word_count: binary.len()
-        };
-
-        let (err_code, diag) = {
-            let mut out_diag = ptr::null_mut();
+    /// Assemble a spirv binary from it's textual form
+    pub fn assemble<'src>(&self, source: &'src str) -> Result<Vec<u32>, AssembleError<'src>> {
+        unsafe {
+            // Setup to call the C library
+            let context = spvContextCreate(self.env.to_raw());
+            let src = CString::new(source)
+                .map_err(|_| AssembleError::InvalidSourceString(source))?;
             
-            let result = if ctx.include_diagnostics {
-                spvValidateWithOptions(
-                    context,
-                    options.raw,
-                    &mut binary as spv_const_binary,
-                    &mut out_diag as *mut spv_diagnostic
-                )
-            }
-            else {
-                spvValidateWithOptions(
-                    context,
-                    options.raw,
-                    &mut binary as spv_const_binary,
-                    ptr::null_mut()
-                )
+            // Assemble the source code
+            let (err_code, bin, diag) = {
+                let str_ptr = src.as_ptr();
+                let str_len = src.as_bytes().len();
+                
+                let mut out_bin: spv_binary = ptr::null_mut();
+                let mut out_diag = ptr::null_mut();
+    
+                let result = if self.include_diagnostics {
+                    spvTextToBinary(
+                        context, 
+                        str_ptr,
+                        str_len,
+                        &mut out_bin as *mut spv_binary,
+                        &mut out_diag as *mut spv_diagnostic
+                    )
+                }
+                else {
+                    spvTextToBinary(
+                        context, 
+                        str_ptr,
+                        str_len,
+                        &mut out_bin as *mut spv_binary,
+                        ptr::null_mut()
+                    )
+                };
+    
+                (result, out_bin, out_diag)
             };
-
-            (result, out_diag)
-        };
-        
-        let result = match err_code {
-            spv_result_t::SUCCESS => Ok(()),
-            _                     => {
-                let (err, diag) = SpvError::from_raw(err_code, diag);
-                Err(ValidateError::SpirvTools(err, diag))
+    
+            // Copy over the resulting code from C memory to Rust memory
+            let result = match err_code {
+                spv_result_t::SUCCESS => {
+                    let slice = slice::from_raw_parts(
+                        (*bin).code, 
+                        (*bin).word_count as usize
+                    );
+    
+                    let mut binary = Vec::with_capacity(slice.len());
+                    binary.copy_from_slice(slice);
+    
+                    Ok(binary)
+                },
+                _                     => {
+                    let (err, diag) = SpvError::from_raw(err_code, diag);
+                    Err(AssembleError::SpirvTools(err, diag))
+                }
+            };
+    
+            // Cleanup
+            if !diag.is_null() {
+                spvDiagnosticDestroy(diag);
             }
-        };
-
-        if !diag.is_null() {
-            spvDiagnosticDestroy(diag);
+    
+            if !bin.is_null() {
+                spvBinaryDestroy(bin);
+            }
+    
+            spvContextDestroy(context);
+    
+            result
         }
+    }
 
-        spvContextDestroy(context);
+    /// Disassemble a spirv binary into it's textual form using default options
+    #[inline]
+    pub fn disassemble(&self, binary: &[u32]) -> Result<String, DisassembleError> {
+        self.disassemble_with_options(binary, DisassembleOptions::none())
+    }
 
-        result
+    /// Disassemble a spirv binary into it's textual form with the specified options
+    pub fn disassemble_with_options(&self, binary: &[u32], options: DisassembleOptions) -> Result<String, DisassembleError> {
+        unsafe {
+            // Setup and disassemble the binary
+            let context = spvContextCreate(self.env.to_raw());
+    
+            let (err_code, text, diag) = {
+                let mut out_text: spv_text = ptr::null_mut();
+                let mut out_diag = ptr::null_mut();
+    
+                let result = if self.include_diagnostics {
+                    spvBinaryToText(
+                        context,
+                        binary.as_ptr(),
+                        binary.len(),
+                        options.into_raw(),
+                        &mut out_text as *mut spv_text,
+                        &mut out_diag as *mut spv_diagnostic
+                    )
+                }
+                else {
+                    spvBinaryToText(
+                        context,
+                        binary.as_ptr(),
+                        binary.len(),
+                        options.into_raw(),
+                        &mut out_text as *mut spv_text,
+                        ptr::null_mut()
+                    )
+                };
+    
+                (result, out_text, out_diag)
+            };
+    
+            let result = match err_code {
+                spv_result_t::SUCCESS => {
+                    let bytes = slice::from_raw_parts(
+                        (*text).string as *const u8, 
+                        (*text).length
+                    );
+    
+                    let text = str::from_utf8(bytes)
+                        .and_then(|x| Ok(x.to_owned()))
+                        .expect("Spirv Tools returned an invalid encoding!");
+    
+                    Ok(text)
+                },
+                _                     => {
+                    let (err, diag) = SpvError::from_raw(err_code, diag);
+                    Err(DisassembleError::SpirvTools(err, diag))
+                }
+            };
+    
+            if !diag.is_null() {
+                spvDiagnosticDestroy(diag);
+            }
+    
+            if !text.is_null() {
+                spvTextDestroy(text);
+            }
+    
+            spvContextDestroy(context);
+    
+            result
+        }
+    }
+
+    /// Validate a spirv binary with the default options
+    #[inline]
+    pub fn validate(&self, binary: &[u32]) -> Result<(), ValidateError> {
+        self.validate_with_options(binary, ValidatorOptions::default())
+    }
+
+    /// Validate a spirv binary with a set of options
+    pub fn validate_with_options(&self, binary: &[u32], options: ValidatorOptions) -> Result<(), ValidateError> {
+        unsafe {
+            let context = spvContextCreate(self.env.to_raw());
+            let mut binary = spv_const_binary_t {
+                code: binary.as_ptr(),
+                word_count: binary.len()
+            };
+    
+            let (err_code, diag) = {
+                let mut out_diag = ptr::null_mut();
+                
+                let result = if self.include_diagnostics {
+                    spvValidateWithOptions(
+                        context,
+                        options.raw,
+                        &mut binary as spv_const_binary,
+                        &mut out_diag as *mut spv_diagnostic
+                    )
+                }
+                else {
+                    spvValidateWithOptions(
+                        context,
+                        options.raw,
+                        &mut binary as spv_const_binary,
+                        ptr::null_mut()
+                    )
+                };
+    
+                (result, out_diag)
+            };
+            
+            let result = match err_code {
+                spv_result_t::SUCCESS => Ok(()),
+                _                     => {
+                    let (err, diag) = SpvError::from_raw(err_code, diag);
+                    Err(ValidateError::SpirvTools(err, diag))
+                }
+            };
+    
+            if !diag.is_null() {
+                spvDiagnosticDestroy(diag);
+            }
+    
+            spvContextDestroy(context);
+    
+            result
+        }
     }
 }

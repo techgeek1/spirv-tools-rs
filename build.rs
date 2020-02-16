@@ -1,21 +1,10 @@
-use std::env;
-use std::path::PathBuf;
+use std::process::Command;
 
 fn main() {
-    /*
-    // Tell cargo to link the spirv library
-    println!("cargo:rustc-link-lib=libspirv");
+    // Construct the build configs if they don't exist
+    
 
-    // Generate the spirv-tools bindings
-    let bindings = bindgen::Builder::default()
-        .header("spirv-tools/include/spirv-tools/libspirv.h")
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
-        .generate()
-        .expect("Unable to generate bindings");
+    // Build the project
 
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    bindings.write_to_file(out_path.join("bindings.rs"))
-        .expect("Failed to write bindings");
-        */
 }
