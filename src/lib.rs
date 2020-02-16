@@ -22,8 +22,6 @@ use std::str;
 
 use self::raw::*;
 
-pub type SpvResult<T> = Result<T, SpvError>;
-
 #[derive(Clone, Copy)]
 pub enum TargetEnv {
     /// SPIR-V 1.0 latest revision, no other restrictions
