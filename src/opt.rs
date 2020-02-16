@@ -209,9 +209,11 @@ impl SpirvOptimizer {
                 let out_len = (*out_bin).word_count;
                 let mut opt_bin = Vec::with_capacity(out_len);
                 
-                ptr::copy(out_ptr, opt_bin.as_mut_ptr(), out_len);
+                ptr::copy_nonoverlapping(out_ptr, opt_bin.as_mut_ptr(), out_len);
 
                 opt_bin.set_len(out_len);
+
+                spvBinaryDestroy(out_bin);
 
                 Ok(opt_bin)
             }
@@ -233,9 +235,11 @@ impl SpirvOptimizer {
                 let out_len = (*out_bin).word_count;
                 let mut opt_bin = Vec::with_capacity(out_len);
                 
-                ptr::copy(out_ptr, opt_bin.as_mut_ptr(), out_len);
+                ptr::copy_nonoverlapping(out_ptr, opt_bin.as_mut_ptr(), out_len);
 
                 opt_bin.set_len(out_len);
+
+                spvBinaryDestroy(out_bin);
 
                 Ok(opt_bin)
             }
