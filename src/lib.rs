@@ -331,6 +331,7 @@ impl SpirvContext {
                     );
     
                     let mut binary = Vec::with_capacity(slice.len());
+                    binary.set_len(slice.len());
                     binary.copy_from_slice(slice);
     
                     Ok(binary)

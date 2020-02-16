@@ -477,7 +477,7 @@ impl spv_validator_limit {
     pub const max_id_bound: Self = Self(8);
 }
 
-#[link(name = "libspirv")]
+#[link(name = "SPIRV-Tools", kind = "static")]
 extern {
     /// Returns the SPIRV-Tools software version as a null-terminated string.
     /// The contents of the underlying storage is valid for the remainder of
@@ -738,7 +738,10 @@ extern {
 
     /// Prints the diagnostic to stderr.
     pub fn spvDiagnosticPrint(diagnostic: spv_diagnostic) -> spv_result_t;
+}
 
+#[link(name = "SPIRV-Tools-opt", kind = "static")]
+extern {
     /// Create an optimizer instance for the target env
     pub fn spvOptimizerCreate(env: spv_target_env) -> spv_optimizer;
 
@@ -848,4 +851,5 @@ extern {
         optimized_binary: *mut spv_binary,
         opt_options: spv_optimizer_options
     ) -> bool;
+
 }
