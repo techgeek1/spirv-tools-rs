@@ -89,11 +89,11 @@ pub enum ValidateError {
 
 /// An error raised during optimization
 #[derive(Clone, Debug)]
-pub enum OptimizerError<'flag> {
+pub enum OptimizerError {
     /// An invalid flag was provided.
     /// 
     /// (provided flag)
-    InvalidFlag(&'flag str),
+    InvalidFlag(String),
 
     /// Optimization failed for some reason
     OptimizationFailed()

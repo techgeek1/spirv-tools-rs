@@ -122,7 +122,7 @@ impl SpirvOptimizer {
             );
 
             if !result {
-                Err(OptimizerError::InvalidFlag(flag))
+                Err(OptimizerError::InvalidFlag(flag.to_owned()))
             }
             else {
                 Ok(self)
