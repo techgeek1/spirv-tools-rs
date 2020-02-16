@@ -264,12 +264,12 @@ impl Default for ValidatorOptions {
 }
 
 /// A context for invoking spirv-tools
-pub struct SpirvContext {
+pub struct Context {
     env: TargetEnv,
     include_diagnostics: bool
 }
 
-impl SpirvContext {
+impl Context {
     /// Create a new context for the target environment
     pub fn new(env: TargetEnv) -> Self {
         Self {

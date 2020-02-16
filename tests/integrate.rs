@@ -130,7 +130,7 @@ const ASM_SRC: &'static str = r#"
 
 #[test]
 fn assemble() {
-    let ctx = SpirvContext::new(TargetEnv::OpenGl4_5);
+    let ctx = Context::new(TargetEnv::OpenGl4_5);
     let assembled = ctx.assemble(ASM_SRC);
 
     assert!(assembled.is_ok(), "Assembly failed with '{:?}'", assembled);
@@ -139,7 +139,7 @@ fn assemble() {
 
 #[test]
 fn disassemble() {
-    let ctx = SpirvContext::new(TargetEnv::OpenGl4_5);
+    let ctx = Context::new(TargetEnv::OpenGl4_5);
     let assembled = ctx.assemble(ASM_SRC)
         .unwrap();
     let disassembled = ctx.disassemble(&assembled);
@@ -151,7 +151,7 @@ fn disassemble() {
 
 #[test]
 fn validate() {
-    let ctx = SpirvContext::new(TargetEnv::OpenGl4_5);
+    let ctx = Context::new(TargetEnv::OpenGl4_5);
 
     let assembled = ctx.assemble(ASM_SRC)
         .unwrap();
@@ -163,8 +163,8 @@ fn validate() {
 
 #[test]
 fn optimize() {
-    let ctx = SpirvContext::new(TargetEnv::OpenGl4_5);
-    let opt = SpirvOptimizer::new(TargetEnv::OpenGl4_5)
+    let ctx = Context::new(TargetEnv::OpenGl4_5);
+    let opt = Optimizer::new(TargetEnv::OpenGl4_5)
         .register_performance_passes();
     
     let assembled = ctx.assemble(ASM_SRC)
